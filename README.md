@@ -1,3 +1,5 @@
+[![Tests](https://github.com/Elandlord/nats-php/actions/workflows/tests.yml/badge.svg)](https://github.com/Elandlord/nats-php/actions/workflows/tests.yml)
+
 # NATS PHP 
 
 A lightweight, framework-agnostic PHP abstraction layer for **NATS** and **JetStream**, built on top of the excellent [`basis-company/nats`](https://github.com/basis-company/nats-php) client.
