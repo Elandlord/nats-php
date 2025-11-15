@@ -1,0 +1,30 @@
+{
+  "name": "elandlord/nats-php",
+  "description": "A lightweight, framework-agnostic PHP abstraction layer for NATS and JetStream. Includes publishers, consumers, message envelopes, and handler interfaces built on top of basis-company/nats.",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Elandlord\\NatsPhp\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=8.1",
+    "basis-company/nats": "^1.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0",
+    "mockery/mockery": "^1.6",
+    "symfony/var-dumper": "^6.0",
+    "pestphp/pest": "^2.36"
+  },
+  "minimum-stability": "stable",
+  "scripts": {
+    "test": "phpunit"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  }
+}
