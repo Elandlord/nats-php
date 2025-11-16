@@ -12,10 +12,10 @@ use Elandlord\NatsPhp\Messaging\EventEnvelope;
  * @copyright    2025, Eric Landheer
  * @license      MIT License
  */
-abstract class AbstractEventPublisher implements EventPublisherInterface
+abstract readonly class AbstractEventPublisher implements EventPublisherInterface
 {
     public function __construct(
-        protected readonly SubjectPublisherInterface $publisher,
+        protected SubjectPublisherInterface $publisher,
     ) {
     }
 

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Elandlord\Nats\Exception;
+namespace Elandlord\NatsPhp\Exception;
 
 use RuntimeException;
 

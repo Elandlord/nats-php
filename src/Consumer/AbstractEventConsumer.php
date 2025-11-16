@@ -3,10 +3,11 @@ declare(strict_types=1);
 
 namespace Elandlord\NatsPhp\Consumer;
 
+use Basis\Nats\Message\Msg;
+use Elandlord\NatsPhp\Connection\NatsConnection;
 use Elandlord\NatsPhp\Contract\Consumer\EventConsumerInterface;
 use Elandlord\NatsPhp\Contract\Handler\EventHandlerInterface;
 use Elandlord\NatsPhp\Messaging\EventEnvelope;
-use Elandlord\NatsPhp\Nats\Model\NatsConnection;
 use Exception;
 use Throwable;
 
@@ -16,6 +17,11 @@ use Throwable;
  */
 abstract class AbstractEventConsumer implements EventConsumerInterface
 {
+    public const ALLOWED_CLASSES_KEY = 'allowed_classes';
+
+    /** @var array<string, EventHandlerInterface> */
+    protected array $handlerMap;
+
     /**
      * @param EventHandlerInterface[] $handlers
      */
@@ -23,11 +29,10 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         protected readonly NatsConnection $connection,
         protected readonly array          $handlers,
         protected readonly string         $streamName,
-        protected readonly string         $consumerName,
-        protected readonly ?string        $subjectFilter = null,
-        protected readonly ?int           $maxDeliver = null,
-        protected readonly ?int           $ackWait = null,
-    ) {
+        protected readonly string         $consumerName
+    )
+    {
+        $this->handlerMap = $this->buildHandlerMap($handlers);
     }
 
     /**
@@ -39,62 +44,79 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         $stream = $client->getApi()->getStream($this->streamName);
 
         $consumer = $stream->getConsumer($this->consumerName);
-
-        $config = $consumer->getConfiguration();
-
-        if ($this->subjectFilter !== null) {
-            $config->setSubjectFilter($this->subjectFilter);
-        }
-
-        if ($this->ackWait !== null) {
-            $config->setAckWait($this->ackWait);
-        }
-
-        if ($this->maxDeliver !== null) {
-            $config->setMaxDeliver($this->maxDeliver);
-        }
-
-        $handlerMap = $this->buildHandlerMap($this->handlers);
         $queue = $consumer->getQueue();
 
         while ($message = $queue->next()) {
-            try {
-                $payload = $message->payload;
-
-                if ($message->replyTo === null) {
-                    continue;
-                }
-
-                /** @var EventEnvelope $envelope */
-                $envelope = unserialize($payload->body, ['allowed_classes' => true]);
-
-                if (!$envelope instanceof EventEnvelope) {
-                    $message->ack();
-                    continue;
-                }
-
-                $eventName = $envelope->eventName;
-                $event = $envelope->body;
-
-                if (!isset($handlerMap[$eventName])) {
-                    $message->ack();
-                    continue;
-                }
-
-                $handlerMap[$eventName]->handle($event);
-
-                $message->ack();
-            } catch (Throwable $e) {
-                $message->nack(1.0);
-            }
+            $this->processMessage($message);
         }
+    }
+
+    protected function processMessage(Msg $message): void
+    {
+        try {
+            if (!$this->shouldProcess($message)) {
+                return;
+            }
+
+            $envelope = $this->extractEnvelope($message);
+            if ($envelope === null) {
+                return;
+            }
+
+            $handler = $this->resolveHandler($envelope);
+            if ($handler === null) {
+                return;
+            }
+
+            $handler->handle($envelope->body);
+            $message->ack();
+
+        } catch (Throwable $exception) {
+            $message->nack(1.0);
+            $this->onProcessingError($exception, $message);
+        }
+    }
+
+    protected function shouldProcess(Msg $message): bool
+    {
+        return $message->replyTo !== null;
+    }
+
+    protected function extractEnvelope(Msg $message): ?EventEnvelope
+    {
+        $raw = $message->payload->body;
+
+        $envelope = $this->deserializeEnvelope($raw);
+
+        if ($envelope instanceof EventEnvelope) {
+            return $envelope;
+        }
+
+        return null;
+    }
+
+    protected function onProcessingError(Throwable $exception, Msg $message): void
+    {
+        // Possible to override by subclasses
+    }
+
+    protected function resolveHandler(EventEnvelope $envelope): ?EventHandlerInterface
+    {
+        return $this->handlerMap[$envelope->eventName] ?? null;
+    }
+
+    protected function deserializeEnvelope(string $envelope): ?EventEnvelope
+    {
+        return unserialize($envelope, [
+            self::ALLOWED_CLASSES_KEY => [EventEnvelope::class]
+        ]);
     }
 
     /**
      * @param EventHandlerInterface[] $handlers
      * @return array<string, EventHandlerInterface>
      */
-    private function buildHandlerMap(array $handlers): array
+    protected function buildHandlerMap(array $handlers): array
     {
         $map = [];
         foreach ($handlers as $handler) {

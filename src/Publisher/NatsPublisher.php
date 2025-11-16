@@ -10,10 +10,10 @@ use Elandlord\NatsPhp\Contract\Model\SubjectPublisherInterface;
  * @copyright    2025, Eric Landheer
  * @license      MIT License
  */
-class NatsPublisher implements SubjectPublisherInterface
+readonly class NatsPublisher implements SubjectPublisherInterface
 {
     public function __construct(
-        protected readonly NatsConnection $connection
+        protected NatsConnection $connection
     ) {
     }
 

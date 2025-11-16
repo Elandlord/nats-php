@@ -16,6 +16,15 @@ class NatsConnection implements NatsConnectionInterface
 {
     protected Client $client;
 
+    public const DEFAULT_CONFIGURATION = [
+        'host' => 'localhost',
+        'port' => 4222,
+        'user' => null,
+        'pass' => null,
+        'reconnect' => true,
+        'pedantic' => false,
+    ];
+
     public function __construct(Client $client)
     {
         $this->client = $client;
@@ -36,19 +45,9 @@ class NatsConnection implements NatsConnectionInterface
         return new self($client);
     }
 
-    /**
-     * Creates a default Configuration instance with sane defaults.
-     */
     public static function createDefaultConfiguration(): Configuration
     {
-        $configuration = new Configuration([
-            'host' => 'localhost',
-            'port' => 4222,
-            'user' => null,
-            'pass' => null,
-            'reconnect' => true,
-            'pedantic' => false,
-        ]);
+        $configuration = new Configuration(self::DEFAULT_CONFIGURATION);
 
         // Delay must be called explicitly
         $configuration->setDelay(0.01);
@@ -66,7 +65,7 @@ class NatsConnection implements NatsConnectionInterface
         try {
             $this->client->ping();
             return true;
-        } catch (Throwable $exception) {
+        } catch (Throwable) {
             return false;
         }
     }
