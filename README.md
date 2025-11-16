@@ -2,7 +2,7 @@
 
 # NATS PHP 
 
-A lightweight, framework-agnostic PHP abstraction layer for **NATS** and **JetStream**, built on top of the excellent [`basis-company/nats`](https://github.com/basis-company/nats-php) client.
+A framework-agnostic PHP abstraction layer for **NATS** using **JetStream**, built on top of [`basis-company/nats`](https://github.com/basis-company/nats-php) client.
 
 This library leverages a structured architecture for using NATS. It can be used in any PHP framework like:
 
@@ -23,3 +23,4 @@ This library leverages a structured architecture for using NATS. It can be used 
 
 `composer require elandlord/nats-php`
 
+## Examples
