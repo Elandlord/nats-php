@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace Elandlord\NatsPhp\Consumer;
 
+use Basis\Nats\Consumer\Consumer;
 use Basis\Nats\Message\Msg;
+use Basis\Nats\Stream\Stream;
 use Elandlord\NatsPhp\Connection\NatsConnection;
 use Elandlord\NatsPhp\Contract\Consumer\EventConsumerInterface;
 use Elandlord\NatsPhp\Contract\Handler\EventHandlerInterface;
@@ -19,6 +21,8 @@ use Throwable;
 abstract class AbstractEventConsumer implements EventConsumerInterface
 {
     public const ALLOWED_CLASSES_KEY = 'allowed_classes';
+    public const DEFAULT_MAX_DELIVER = 3;
+    public const DEFAULT_ACK_WAIT_MS = 10_000;
 
     /** @var array<string, EventHandlerInterface> */
     protected array $handlerMap;
@@ -30,7 +34,10 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         protected readonly NatsConnection $connection,
         protected readonly array          $handlers,
         protected readonly string         $streamName,
-        protected readonly string         $consumerName
+        protected readonly string         $consumerName,
+        protected readonly ?string        $subjectFilter = null,
+        protected readonly int            $maxDeliver = self::DEFAULT_MAX_DELIVER,
+        protected readonly int            $ackWait = self::DEFAULT_ACK_WAIT_MS,
     )
     {
         $this->handlerMap = $this->buildHandlerMap($handlers);
@@ -44,12 +51,26 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         $client = $this->connection->getClient();
         $stream = $client->getApi()->getStream($this->streamName);
 
-        $consumer = $stream->getConsumer($this->consumerName);
+        $consumer = $this->getOrCreateConsumer($stream);
         $queue = $consumer->getQueue();
 
         while ($message = $queue->next()) {
             $this->processMessage($message);
         }
+    }
+
+    protected function getOrCreateConsumer(Stream $stream): Consumer
+    {
+        $consumer = $stream->getConsumer($this->consumerName);
+        $config = $consumer->getConfiguration();
+
+        if ($this->subjectFilter !== null) {
+            $config->setSubjectFilter($this->subjectFilter);
+        }
+
+        $config->setAckWait($this->ackWait);
+        $config->setMaxDeliver($this->maxDeliver);
+        return $consumer->create();
     }
 
     protected function processMessage(Msg $message): void
