@@ -106,7 +106,7 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
     protected function deserializeEnvelope(string $envelope): ?EventEnvelope
     {
         return unserialize($envelope, [
-            self::ALLOWED_CLASSES_KEY => [EventEnvelope::class]
+            self::ALLOWED_CLASSES_KEY => true
         ]);
     }
 
