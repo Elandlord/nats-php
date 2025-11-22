@@ -7,6 +7,7 @@ use Basis\Nats\Message\Msg;
 use Elandlord\NatsPhp\Connection\NatsConnection;
 use Elandlord\NatsPhp\Contract\Consumer\EventConsumerInterface;
 use Elandlord\NatsPhp\Contract\Handler\EventHandlerInterface;
+use Elandlord\NatsPhp\Exception\InvalidEventEnvelopeException;
 use Elandlord\NatsPhp\Messaging\EventEnvelope;
 use Exception;
 use Throwable;
@@ -59,9 +60,6 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
             }
 
             $envelope = $this->extractEnvelope($message);
-            if ($envelope === null) {
-                return;
-            }
 
             $handler = $this->resolveHandler($envelope);
             if ($handler === null) {
@@ -82,7 +80,7 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         return $message->replyTo !== null;
     }
 
-    protected function extractEnvelope(Msg $message): ?EventEnvelope
+    protected function extractEnvelope(Msg $message): EventEnvelope
     {
         $raw = $message->payload->body;
 
@@ -92,7 +90,7 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
             return $envelope;
         }
 
-        return null;
+        throw new InvalidEventEnvelopeException();
     }
 
     protected function onProcessingError(Throwable $exception, Msg $message): void
