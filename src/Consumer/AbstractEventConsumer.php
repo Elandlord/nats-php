@@ -12,6 +12,7 @@ use Elandlord\NatsPhp\Contract\Handler\EventHandlerInterface;
 use Elandlord\NatsPhp\Exception\InvalidEventEnvelopeException;
 use Elandlord\NatsPhp\Messaging\EventEnvelope;
 use Exception;
+use JsonException;
 use Throwable;
 
 /**
@@ -70,6 +71,7 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
 
         $config->setAckWait($this->ackWait);
         $config->setMaxDeliver($this->maxDeliver);
+
         return $consumer->create();
     }
 
@@ -101,17 +103,24 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         return $message->replyTo !== null;
     }
 
+    /**
+     * @throws JsonException
+     */
     protected function extractEnvelope(Msg $message): EventEnvelope
     {
         $raw = $message->payload->body;
 
-        $envelope = $this->deserializeEnvelope($raw);
+        $data = $this->decodeEnvelope($raw);
 
-        if ($envelope instanceof EventEnvelope) {
-            return $envelope;
+        $hasEventData = isset($data[EventEnvelope::EVENT_NAME_KEY], $data[EventEnvelope::BODY_KEY]);
+        if (!$hasEventData) {
+            throw new InvalidEventEnvelopeException();
         }
 
-        throw new InvalidEventEnvelopeException();
+        return new EventEnvelope(
+            eventName: $data[EventEnvelope::EVENT_NAME_KEY],
+            body: $data[EventEnvelope::BODY_KEY]
+        );
     }
 
     protected function onProcessingError(Throwable $exception, Msg $message): void
@@ -124,11 +133,20 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         return $this->handlerMap[$envelope->eventName] ?? null;
     }
 
-    protected function deserializeEnvelope(string $envelope): ?EventEnvelope
+    /**
+     * @return array<string,mixed>
+     *
+     * @throws JsonException
+     */
+    protected function decodeEnvelope(string $raw): array
     {
-        return unserialize($envelope, [
-            self::ALLOWED_CLASSES_KEY => true
-        ]);
+        $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+
+        if (!is_array($decoded)) {
+            throw new InvalidEventEnvelopeException();
+        }
+
+        return $decoded;
     }
 
     /**

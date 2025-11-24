@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace Elandlord\NatsPhp\Contract\Message;
 
+use JsonSerializable;
+
 /**
  * Implement this on objects (DTO) that are sent as NATS events.
  * @copyright    2025, Eric Landheer
  * @license      MIT License
  */
-interface EventMessageInterface
+interface EventMessageInterface extends JsonSerializable
 {
     public function getEventName(): string;
 }
