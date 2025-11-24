@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Elandlord\NatsPhp\Messaging;
 
-use Elandlord\NatsPhp\Contract\Message\EventMessageInterface;
 use JsonSerializable;
 
 /**
@@ -16,8 +15,8 @@ class EventEnvelope implements JsonSerializable
     public const BODY_KEY = 'body';
 
     public function __construct(
-        public string                $eventName,
-        public EventMessageInterface $body
+        public string $eventName,
+        public array  $body
     )
     {
     }
