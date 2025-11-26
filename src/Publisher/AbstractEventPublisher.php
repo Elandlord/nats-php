@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace Elandlord\NatsPhp\Publisher;
 
-use Elandlord\NatsPhp\Contract\Message\EventMessageInterface;
+use CloudEvents\Serializers\JsonSerializer;
+use CloudEvents\V1\CloudEventInterface;
 use Elandlord\NatsPhp\Contract\Model\SubjectPublisherInterface;
 use Elandlord\NatsPhp\Contract\Publisher\EventPublisherInterface;
-use Elandlord\NatsPhp\Messaging\EventEnvelope;
 
 /**
  * @copyright    2025, Eric Landheer
@@ -19,24 +19,18 @@ abstract readonly class AbstractEventPublisher implements EventPublisherInterfac
     ) {
     }
 
-    public function publish(EventMessageInterface $event): void
+    public function publish(CloudEventInterface $event): void
     {
-        $eventName = $event->getEventName();
+        $payload = JsonSerializer::create()->serializeStructured($event);
 
-        $envelope = new EventEnvelope(
-            eventName: $eventName,
-            body: $event
-        );
-
-        $payload = serialize($envelope);
-        $subject = $this->buildSubject($eventName);
-
+        $subject = $this->buildSubject($event->getType());
         $this->publisher->publish($subject, $payload);
     }
 
-    protected function buildSubject(string $eventName): string
+    protected function buildSubject(string $eventType): string
     {
-        return sprintf('%s.%s', $this->getSubjectPrefix(), $eventName);
+        $prefix = $this->getSubjectPrefix();
+        return $prefix !== '' ? sprintf('%s.%s', $prefix, $eventType) : $eventType;
     }
 
     abstract protected function getSubjectPrefix(): string;

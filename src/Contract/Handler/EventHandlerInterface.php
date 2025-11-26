@@ -3,13 +3,11 @@ declare(strict_types=1);
 
 namespace Elandlord\NatsPhp\Contract\Handler;
 
-/**
- * @copyright    2025, Eric Landheer
- * @license      MIT License
- */
+use CloudEvents\V1\CloudEventInterface;
+
 interface EventHandlerInterface
 {
-    public function getHandledEventName(): string;
+    public function getHandledEventType(): string;
 
-    public function handle(array $event): void;
+    public function handle(CloudEventInterface $event): void;
 }

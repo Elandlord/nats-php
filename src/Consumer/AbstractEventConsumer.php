@@ -6,11 +6,15 @@ namespace Elandlord\NatsPhp\Consumer;
 use Basis\Nats\Consumer\Consumer;
 use Basis\Nats\Message\Msg;
 use Basis\Nats\Stream\Stream;
+use CloudEvents\Exceptions\InvalidPayloadSyntaxException;
+use CloudEvents\Exceptions\MissingAttributeException;
+use CloudEvents\Exceptions\UnsupportedSpecVersionException;
+use CloudEvents\Serializers\JsonDeserializer;
+use CloudEvents\V1\CloudEventInterface;
 use Elandlord\NatsPhp\Connection\NatsConnection;
 use Elandlord\NatsPhp\Contract\Consumer\EventConsumerInterface;
 use Elandlord\NatsPhp\Contract\Handler\EventHandlerInterface;
-use Elandlord\NatsPhp\Exception\InvalidEventEnvelopeException;
-use Elandlord\NatsPhp\Messaging\EventEnvelope;
+use Elandlord\NatsPhp\Exception\InvalidCloudEventException;
 use Exception;
 use JsonException;
 use Throwable;
@@ -21,7 +25,6 @@ use Throwable;
  */
 abstract class AbstractEventConsumer implements EventConsumerInterface
 {
-    public const ALLOWED_CLASSES_KEY = 'allowed_classes';
     public const DEFAULT_MAX_DELIVER = 3;
     public const DEFAULT_ACK_WAIT_MS = 10_000;
 
@@ -82,20 +85,38 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
                 return;
             }
 
-            $envelope = $this->extractEnvelope($message);
+            $cloudEvent = $this->extractCloudEvent($message);
+            $handler = $this->resolveHandler($cloudEvent);
 
-            $handler = $this->resolveHandler($envelope);
             if ($handler === null) {
+                $message->ack();
                 return;
             }
 
-            $handler->handle($envelope->body);
+            $handler->handle($cloudEvent);
             $message->ack();
-
         } catch (Throwable $exception) {
             $message->nack(1.0);
             $this->onProcessingError($exception, $message);
         }
+    }
+
+    /**
+     * @throws UnsupportedSpecVersionException
+     * @throws InvalidPayloadSyntaxException
+     * @throws MissingAttributeException
+     */
+    protected function extractCloudEvent(Msg $message): CloudEventInterface
+    {
+        $raw = $message->payload->body;
+
+        $event = JsonDeserializer::create()->deserializeStructured($raw);
+
+        if (!$event instanceof CloudEventInterface) {
+            throw new InvalidCloudEventException('Unsupported CloudEvents spec version.');
+        }
+
+        return $event;
     }
 
     protected function shouldProcess(Msg $message): bool
@@ -103,50 +124,14 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
         return $message->replyTo !== null;
     }
 
-    /**
-     * @throws JsonException
-     */
-    protected function extractEnvelope(Msg $message): EventEnvelope
-    {
-        $raw = $message->payload->body;
-
-        $data = $this->decodeEnvelope($raw);
-
-        $hasEventData = isset($data[EventEnvelope::EVENT_NAME_KEY], $data[EventEnvelope::BODY_KEY]);
-        if (!$hasEventData) {
-            throw new InvalidEventEnvelopeException();
-        }
-
-        return new EventEnvelope(
-            eventName: $data[EventEnvelope::EVENT_NAME_KEY],
-            body: $data[EventEnvelope::BODY_KEY]
-        );
-    }
-
     protected function onProcessingError(Throwable $exception, Msg $message): void
     {
         // Possible to override by subclasses
     }
 
-    protected function resolveHandler(EventEnvelope $envelope): ?EventHandlerInterface
+    protected function resolveHandler(CloudEventInterface $event): ?EventHandlerInterface
     {
-        return $this->handlerMap[$envelope->eventName] ?? null;
-    }
-
-    /**
-     * @return array<string,mixed>
-     *
-     * @throws JsonException
-     */
-    protected function decodeEnvelope(string $raw): array
-    {
-        $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-
-        if (!is_array($decoded)) {
-            throw new InvalidEventEnvelopeException();
-        }
-
-        return $decoded;
+        return $this->handlerMap[$event->getType()] ?? null;
     }
 
     /**
@@ -157,7 +142,7 @@ abstract class AbstractEventConsumer implements EventConsumerInterface
     {
         $map = [];
         foreach ($handlers as $handler) {
-            $map[$handler->getHandledEventName()] = $handler;
+            $map[$handler->getHandledEventType()] = $handler;
         }
         return $map;
     }

@@ -10,7 +10,8 @@
   },
   "require": {
     "php": ">=8.2",
-    "basis-company/nats": "^1.0"
+    "basis-company/nats": "^1.0",
+    "cloudevents/sdk-php": "^1.2"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",
