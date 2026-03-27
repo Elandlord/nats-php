@@ -35,6 +35,11 @@ class JetStreamPublisher implements SubjectPublisherInterface
 
     public function publish(string $subject, string $payload): void
     {
+        $this->stream->publish($subject, $payload);
+    }
+
+    public function publishFireAndForget(string $subject, string $payload): void
+    {
         $this->stream->put($subject, $payload);
     }
 }
